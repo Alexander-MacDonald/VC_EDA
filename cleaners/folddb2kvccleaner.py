@@ -35,13 +35,10 @@ def flush_entry(block):
     try:
         year_index = next(i for i, line in enumerate(block) if founding_year_pattern.fullmatch(line.strip()))
     except StopIteration:
-        return None  # skip if no founding year
+        return None
 
-    # Extract year and bio
     founding_year = block[year_index].strip()
     bio = block[year_index + 1].strip() if year_index + 1 < len(block) else ""
-
-    # Entry block ends before year
     entry_lines = block[:year_index]
 
     entry = {
@@ -62,50 +59,55 @@ def flush_entry(block):
         "Description": ""
     }
 
-    # Basic URL detection
-    first_line = normalize_url(entry_lines[0])
-    if "://" in first_line:
-        entry["URL"] = first_line
-        entry["Company"] = entry_lines[1].strip() if len(entry_lines) > 1 else ""
-        idx = 2
-    else:
-        entry["URL"] = ""
-        entry["Company"] = entry_lines[0].strip()
-        idx = 1
-
-    rest = entry_lines[idx:]
-
-    # Split numeric fields (from bottom)
-    if rest and rest[-1].isdigit():
-        entry["Number of Exits"] = rest.pop()
-    if rest and rest[-1].isdigit():
-        entry["Number of Investments"] = rest.pop()
-
-    # Split out social links from the remaining lines
+    # Separate out social links and possible firm URLs
     non_social_lines = []
-    for line in rest:
+    candidate_urls = []
+
+    for line in entry_lines:
         line = line.strip()
-        if social_patterns["Twitter"].search(line):
-            entry["Twitter Link"] = line
-        elif social_patterns["LinkedIn"].search(line):
-            entry["LinkedIn Link"] = line
-        elif social_patterns["Facebook"].search(line):
-            entry["Facebook Link"] = line
+        if not line:
+            continue
+
+        norm_line = normalize_url(line)
+
+        if social_patterns["Twitter"].search(norm_line):
+            entry["Twitter Link"] = norm_line
+        elif social_patterns["LinkedIn"].search(norm_line):
+            entry["LinkedIn Link"] = norm_line
+        elif social_patterns["Facebook"].search(norm_line):
+            entry["Facebook Link"] = norm_line
+        elif "http" in norm_line or "www." in norm_line:
+            candidate_urls.append(norm_line)
         else:
             non_social_lines.append(line)
 
-    # Now process the remaining "content" lines
+    # Pick company name as first non-social line
+    if non_social_lines:
+        entry["Company"] = non_social_lines[0]
+        non_social_lines = non_social_lines[1:]
+
+    # Choose firm URL that is NOT a known social platform
+    for url in candidate_urls:
+        if not any(pattern.search(url) for pattern in social_patterns.values()):
+            entry["URL"] = url
+            break
+
+    # Check last two numeric values
+    if non_social_lines and non_social_lines[-1].isdigit():
+        entry["Number of Exits"] = non_social_lines.pop()
+    if non_social_lines and non_social_lines[-1].isdigit():
+        entry["Number of Investments"] = non_social_lines.pop()
+
+    # Now parse structured content
     field_order = ["Portfolio Companies", "Fund Type", "Fund Stage", "Fund Focus", "Location", "Description"]
     current_field = 0
     field_chunks = {field: [] for field in field_order}
 
     for line in non_social_lines:
         field_chunks[field_order[current_field]].append(line)
-        # Optional: change this logic if you have a smarter way to determine where one field ends
         if current_field < len(field_order) - 1 and line == "":
             current_field += 1
 
-    # Assign the collected chunks to the fields
     for field in field_order:
         joined = ", ".join([l for l in field_chunks[field] if l])
         entry[field] = joined.strip()
@@ -121,15 +123,21 @@ with open("../data/folk_db_2k_vc.txt", "r", encoding="utf-8") as file:
         current_block.append(stripped)
 
         if founding_year_pattern.fullmatch(stripped):
-            # Likely end of an entry, grab one more line for bio
+            # Peek ahead to next line (bio OR accidental URL)
             next_line = next(file, "").strip()
-            if next_line:
+
+            # Only treat it as a bio if it's not a link or suspicious
+            if next_line and not next_line.lower().startswith(("http", "www.")) and not any(social in next_line for social in ["linkedin.com", "twitter.com", "facebook.com"]):
                 current_block.append(next_line)
 
             record = flush_entry(current_block)
             if record:
                 entries.append(record)
             current_block = []
+
+            # If the next line was a URL, treat it as part of the next entry
+            if next_line and (next_line.lower().startswith(("http", "www.")) or "linkedin.com" in next_line or "twitter.com" in next_line or "facebook.com" in next_line):
+                current_block.append(next_line)
 
 # Write to CSV
 with open("../cleanedData/CLEAN_folk_db_2k_vc.csv", "w", newline='', encoding='utf-8') as f:
