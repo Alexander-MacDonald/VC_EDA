@@ -166,6 +166,9 @@ for idx, entry in enumerate(json_data):
 
         if(any("hardware" in industry.lower() for industry in entry["industries"])):
             firm.updateWeight("hardware_industry")
+
+        if(any("space" in industry.lower() for industry in entry["industries"])):
+            firm.updateWeight("space_industry")
     else:
         firm.updateUnknownWeight("ai_industry")
         firm.updateUnknownWeight("hardware_industry")
@@ -199,7 +202,7 @@ print("NUMBER OF DATA POINTS: ", len(processedData))
 df = buildCBDF(processedData)
 df_sorted = df.sort_values(by="concrete_value", ascending=False)
 df_sorted.head(50).to_csv("VC_REPORT.csv", index=False)
-print(df_sorted.drop(columns=["raw_data"]).head(20).to_string())
+print(df_sorted.drop(columns=["raw_data", "founder_bias"]).head(20).to_string())
 print(calculateDataPointCount(json_data))
 
 #collect all tokens

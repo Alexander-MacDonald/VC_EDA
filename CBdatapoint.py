@@ -39,6 +39,7 @@ WEIGHTS = {
     "seed_stage": 1.2,
     "ai_industry": 1.1,
     "hardware_industry": 1.2,
+    "space_industry": 0.8,
     "global_focus": 1.1,
     "us_focus": 1.2,
     "out_of_range_check": 0.01,
