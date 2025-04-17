@@ -90,3 +90,19 @@ def buildCBDF(CBDatapoints):
     df.set_index("index", inplace=True)
     
     return df
+
+def calculateDataPointCount(json):
+    count = 0
+
+    if isinstance(json, dict):
+        for value in json.values():
+            count += calculateDataPointCount(value)
+
+    elif isinstance(json, list):
+        for item in json:
+            count += calculateDataPointCount(item)
+
+    else:
+        count += 1  # Primitive value (string, number, bool, None)
+
+    return count

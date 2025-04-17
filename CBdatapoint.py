@@ -46,7 +46,7 @@ WEIGHTS = {
     "up_to_check": 1.15,
     "potential_check": 1.05,
     "no_mrr_data": 1.1,
-    "pre_revenue": 1.2,
+    "pre_revenue": 1.4,
     "in_mrr_range": 1.2,
     "out_of_mrr_range": 0.01,
     "us_region_focus": 1.1

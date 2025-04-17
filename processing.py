@@ -25,12 +25,15 @@ investment_stage_tokens = set()
 industries_tokens = set()
 geographic_focus_tokens = set()
 
+#companies that are erroneous
 keyErrors = []
+#companies that invest in b2b, ai, and hardware
 goalEntries = []
 
+#output data
 processedData = []
 
-file_path = 'chatgpt4.json'
+file_path = 'output/chatgpt4.json'
 json_data = read_json_file(file_path)
 
 for idx, entry in enumerate(json_data):
@@ -49,6 +52,7 @@ for idx, entry in enumerate(json_data):
     if(entry["invests_in_ai_companies"] and entry["invests_in_hardware_companies"] and entry["invests_in_b2b_companies"]):
         goalEntries.append(entry)
 
+    #check size logic based on CBdatapoints.py
     if(entry["estimated_check_size_text"] != None):
         checksize = entry["estimated_check_size_text"].lower()
         rangevalues = extract_money_values(checksize)
@@ -59,6 +63,7 @@ for idx, entry in enumerate(json_data):
             #check if large_check < range min
             #check if small_check > range max
             if(len(rangevalues) == 1):
+                #removing error values below 1000 will make this potentially an "up to" category now, tokenization can be messy
                 if(LARGE_CHECK < rangevalues[0]):
                     firm.updateWeight("up_to_check")
                     firm.addCheckSizeContext("Below Up To Max")
@@ -74,6 +79,7 @@ for idx, entry in enumerate(json_data):
                     firm.addCheckSizeContext("In Funding Range")
 
         elif("up to" in checksize):
+            #checks described with only an upper limit
             if(LARGE_CHECK < rangevalues[0]):
                 firm.updateWeight("up_to_check")
                 firm.addCheckSizeContext("Below Up To Max")
@@ -81,12 +87,15 @@ for idx, entry in enumerate(json_data):
                 firm.updateWeight("out_of_range_check")
                 firm.addCheckSizeContext("Out of Check Range")
         elif("needs" in checksize or "varies" in checksize or "vary" in checksize):
+            #gpt response regarding vagueness "business needs"
             firm.updateUnknownWeight("potential_check")
             firm.addCheckSizeContext("Varies")
         elif("disclosed" in checksize or "not publicly" in checksize):
+            #gpt response regarding undisclosed checks
             firm.updateUnknownWeight("potential_check")
             firm.addCheckSizeContext("Not Disclosed")
         elif("n/a" in checksize or checksize == ""):
+            #gpt response for missing data
             firm.updateUnknownWeight("potential_check")
             firm.addCheckSizeContext("No Data")
         else:
@@ -106,6 +115,7 @@ for idx, entry in enumerate(json_data):
             firm.updateWeight("pre_revenue")
             firm.addMRRContext("Pre-Revenue")
         elif("traction" in mrr):
+            #traction was often used to say early stage companies with some revenue, our current MRR is 0, can be updated in CBdatapoint.py
             if(CURRENT_MRR == 0):
                 firm.updateWeight("out_of_mrr_range")
                 firm.addMRRContext("MRR Out of Range")
@@ -147,7 +157,7 @@ for idx, entry in enumerate(json_data):
     else:
         firm.updateUnknownWeight("seed_stage")
     
-    #ai regex
+    #ai industry regex - avoided cases where "sustAInability" was being caught
     ai_pattern = re.compile(r'\b(ai|gen ai|artificial intelligence)\b', re.IGNORECASE)
 
     if(entry["industries"] != None):
@@ -164,13 +174,15 @@ for idx, entry in enumerate(json_data):
     if(entry["geographic_focus"] != None):
         #if we hallucinate non string datatype
         if(type(entry["geographic_focus"]) is not str):
-            print(type(entry["geographic_focus"]))
+            print("TYPE ERROR: ", type(entry["geographic_focus"]))
 
         if("global" in entry["geographic_focus"].lower()):
             firm.updateWeight("global_focus")
 
         elif("united states" in entry["geographic_focus"].lower() or " usa " in entry["geographic_focus"].lower()):
             firm.updateWeight("us_focus")
+            #geographic terms found in the initial 3k company data set
+            #they are specified in CBdatapoint.py
             if(any(keyword in entry["geographic_focus"] for keyword in INCLUDED_US_REGION_TOKENS)):
                 firm.updateWeight("us_region_focus")
     else:
@@ -186,7 +198,9 @@ print("NUMBER OF DATA POINTS: ", len(processedData))
 
 df = buildCBDF(processedData)
 df_sorted = df.sort_values(by="concrete_value", ascending=False)
+df_sorted.head(50).to_csv("VC_REPORT.csv", index=False)
 print(df_sorted.drop(columns=["raw_data"]).head(20).to_string())
+print(calculateDataPointCount(json_data))
 
 #collect all tokens
 # for hat_trick_firm in goalEntries:
