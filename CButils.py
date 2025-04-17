@@ -4,7 +4,7 @@ import pandas as pd
 
 def read_json_file(file_path):
     try:
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
             return data
     except FileNotFoundError:
@@ -79,7 +79,11 @@ def buildCBDF(CBDatapoints):
         "firmname": dp.firmname,
         "concrete_value": dp.concreteValue,
         "unknown_value": dp.unknownValue,
-        "total_potential": dp.concreteValue * dp.unknownValue
+        "total_potential": dp.concreteValue * dp.unknownValue,
+        "check_context": dp.checkSizeContext,
+        "MRR_context": dp.MRRContext,
+        "founder_bias": dp.founderBias,
+        "raw_data": dp.data
     } for dp in CBDatapoints])
 
     # Set the index of the DataFrame to the "index" column

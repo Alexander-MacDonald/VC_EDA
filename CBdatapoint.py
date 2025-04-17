@@ -2,8 +2,37 @@ SMALL_CHECK = 300_000
 LARGE_CHECK = 750_000
 CURRENT_MRR = 0
 
+#tokens based on dataset, will change with more data
+EXCLUDED_US_REGION_TOKENS = [
+    "southeastern",
+    "rocky mountain",
+    "texas",
+    "new york",
+    "midwest",
+    "middle america",
+    "california",
+    "west coast",
+    "florida",
+    "underserved",
+    "southeast",
+    "rockies",
+    "southwest",
+    "colorado",
+    "pacific northwest",
+    "mid-america",
+]
+
+INCLUDED_US_REGION_TOKENS = [
+    "northeast",
+    "east coast",
+    "boston",
+    "massachusetts",
+    "eastern",
+    " ma ",
+]
+
 WEIGHTS = {
-    "invests_in_hardware" : 1.1,
+    "invests_in_hardware" : 1.2,
     "invests_in_b2b" : 1.1,
     "invests_in_ai" : 1.1,
     "us_based" : 1.1,
@@ -20,6 +49,7 @@ WEIGHTS = {
     "pre_revenue": 1.2,
     "in_mrr_range": 1.2,
     "out_of_mrr_range": 0.01,
+    "us_region_focus": 1.1
 }
 
 class CBDatapoint:
@@ -31,6 +61,7 @@ class CBDatapoint:
         self.data = rawdata
         self.checkSizeContext = ""
         self.MRRContext = ""
+        self.founderBias = ""
     
     def __str__(self):
         return f'{self.index} | {self.firmname} | {self.concreteValue} | {self.unknownValue}\n'
@@ -46,3 +77,6 @@ class CBDatapoint:
 
     def addMRRContext(self, context):
         self.MRRContext = context
+
+    def addFounderBias(self, bias):
+        self.founderBias = bias

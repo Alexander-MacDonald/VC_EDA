@@ -1,6 +1,7 @@
 import re
 from CButils import *
 from CBdatapoint import *
+pd.set_option('display.max_colwidth', 0)
 
 #score methodology
 #if invests in b2b - done
@@ -12,11 +13,11 @@ from CBdatapoint import *
 #if geographic focus in global
 #if hardware subtring listed in industry - done
 #if ai substring listed in industry - done
-#if check size in range (isolate numbers from text, only reliable way)
-#   no isolatable numbers? add to missing value
-#add mrr nuance
+#if check size in range (isolate numbers from text, only reliable way) - done
+#   no isolatable numbers? add to missing value - done
+#add mrr nuance - done
 
-#TODO ADD POTENTIAL SCORE
+#DONE ADD POTENTIAL SCORE
 
 #easily tokenable items
 country_tokens = set()
@@ -60,19 +61,25 @@ for idx, entry in enumerate(json_data):
             if(len(rangevalues) == 1):
                 if(LARGE_CHECK < rangevalues[0]):
                     firm.updateWeight("up_to_check")
+                    firm.addCheckSizeContext("Below Up To Max")
                 else:
                     firm.updateWeight("out_of_range_check")
+                    firm.addCheckSizeContext("Out of Check Range")
             else:
                 if(LARGE_CHECK < rangevalues[0] or SMALL_CHECK > rangevalues[1]):
                     firm.updateWeight("out_of_range_check")
+                    firm.addCheckSizeContext("Out of Check Range")
                 else:
                     firm.updateWeight("in_range_check")
+                    firm.addCheckSizeContext("In Funding Range")
 
         elif("up to" in checksize):
             if(LARGE_CHECK < rangevalues[0]):
                 firm.updateWeight("up_to_check")
+                firm.addCheckSizeContext("Below Up To Max")
             else:                    
                 firm.updateWeight("out_of_range_check")
+                firm.addCheckSizeContext("Out of Check Range")
         elif("needs" in checksize or "varies" in checksize or "vary" in checksize):
             firm.updateUnknownWeight("potential_check")
             firm.addCheckSizeContext("Varies")
@@ -97,11 +104,14 @@ for idx, entry in enumerate(json_data):
         mrr = mrr.lower()
         if("pre-revenue" in mrr or "$0" in mrr):
             firm.updateWeight("pre_revenue")
+            firm.addMRRContext("Pre-Revenue")
         elif("traction" in mrr):
             if(CURRENT_MRR == 0):
                 firm.updateWeight("out_of_mrr_range")
+                firm.addMRRContext("MRR Out of Range")
             else:
                 firm.updateWeight("in_mrr_range")
+                firm.addMRRContext("In MRR Range")
         elif("varies" in mrr or "vary" in mrr or "not specified" in mrr):
             firm.updateUnknownWeight("no_mrr_data")
             firm.addMRRContext("Variable Requirements")
@@ -110,11 +120,13 @@ for idx, entry in enumerate(json_data):
             if(len(potential_numbers) > 0):
                 if(potential_numbers[0] > CURRENT_MRR):
                     firm.updateWeight("out_of_mrr_range")
+                    firm.addMRRContext("MRR Out of Range")
                 else:
                     firm.updateWeight("in_mrr_range")
+                    firm.addMRRContext("In MRR Range")
             else:
                 firm.updateUnknownWeight("no_mrr_data")
-                firm.addMRRContext("Specific Classifier")
+                firm.addMRRContext("Specific MRR Classifier")
 
     if(entry["invests_in_hardware_companies"]):
         firm.updateWeight("invests_in_hardware")
@@ -148,19 +160,24 @@ for idx, entry in enumerate(json_data):
         firm.updateUnknownWeight("ai_industry")
         firm.updateUnknownWeight("hardware_industry")
 
+
     if(entry["geographic_focus"] != None):
-        if(any("global" in sector.lower() for sector in entry["geographic_focus"])):
+        #if we hallucinate non string datatype
+        if(type(entry["geographic_focus"]) is not str):
+            print(type(entry["geographic_focus"]))
+
+        if("global" in entry["geographic_focus"].lower()):
             firm.updateWeight("global_focus")
 
-        if(any("united states" in sector.lower() for sector in entry["geographic_focus"])):
+        elif("united states" in entry["geographic_focus"].lower() or " usa " in entry["geographic_focus"].lower()):
             firm.updateWeight("us_focus")
-        
-        if(any(" usa " in sector.lower() for sector in entry["geographic_focus"])):
-            firm.updateWeight("us_focus")
+            if(any(keyword in entry["geographic_focus"] for keyword in INCLUDED_US_REGION_TOKENS)):
+                firm.updateWeight("us_region_focus")
     else:
         firm.updateUnknownWeight("global_focus")
         firm.updateUnknownWeight("us_focus")
 
+    firm.addFounderBias(entry["founder_profile_bias"])
     processedData.append(firm)
 
 print("NUMBER OF FIRMS: " + str(len(json_data)))
@@ -169,7 +186,7 @@ print("NUMBER OF DATA POINTS: ", len(processedData))
 
 df = buildCBDF(processedData)
 df_sorted = df.sort_values(by="concrete_value", ascending=False)
-print(df_sorted.head(20).to_string())
+print(df_sorted.drop(columns=["raw_data"]).head(20).to_string())
 
 #collect all tokens
 # for hat_trick_firm in goalEntries:
